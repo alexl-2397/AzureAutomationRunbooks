@@ -1,0 +1,17 @@
+# Set variables
+$subscription = "[SUBSCRIPTION NAME]"
+$resourceGroup = "[RESOURCE GROUP NAME]"
+$storageAccount = "[STORAGE ACCOUNT NAME]"
+
+try {
+	Connect-AzAccount -Identity -Subscription $subscription
+	Write-Output "Successfully connected the Azure Managed Identity."
+} catch {
+	Write-Error -Exception $_.Exception
+	throw $_.Exception
+}
+
+# Change -EnableSftp to $true or $false depending on if you want it enabled or disabled
+# Change -EnableLocalUser if you want to stop ALL local users accessing the Storage Account - Unfortunately Microsoft don't let you specify local users. Changing this parameter is unneeded if you're disabling SFTP as a whole.
+
+Set-AzStorageAccount -ResourceGroupName $resourceGroup -Name $storageAccount -EnableSftp $true -EnableLocalUser $true -Force
