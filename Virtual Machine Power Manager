@@ -1,0 +1,59 @@
+# Set variables
+$SubscriptionName = [SUBSCRIPTION]
+$VM_ResourceGroupName = [RESOURCE GROUP]
+$VM_Name = [VIRTUAL MACHINE NAME]
+$Operation = "Stop" # "Start" or "Stop"
+
+# You shouldn't need to change anything below this line to allow the runbook to run.
+
+# Stop on Errors
+# Runbook would show Completed if this were not set, even if errors occurred.
+# We need to see when errors occur, so we must stop the runbook on errors.
+$ErrorActionPreference = "Stop"
+
+# Check the Operation variable is set correctly
+If ($Operation -ne "Start" -and $Operation -ne "Stop") {
+	Write-Error -Message "Operation variable is not set correctly.`nCurrent value: $Operation`nExpected value: Start | Stop`nPlease edit the runbook and fix this issue."
+	throw "Operation variable value invalid"
+}
+
+# Connect Managed Identity
+try {
+	Connect-AzAccount -Identity -Subscription $SubscriptionName
+	Write-Output "Successfully connected the Azure Managed Identity."
+} catch {
+	Write-Error -Exception $_.Exception
+	throw $_.Exception
+}
+
+# Operate upon the VM
+Write-Output "$Operation the VM - this may take some time..."
+
+try {
+	$AzVM_Status = Get-AzVM -ResourceGroupName $VM_ResourceGroupName -Name $VM_Name -Status
+	$AzVM_RunningCode = $AzVM_Status.Statuses[1].Code
+
+	If ($Operation -eq "Start") {
+		If ($AzVM_RunningCode -eq "PowerState/running") {
+			Write-Warning -Message "VM is already running. Nothing to do.`nExiting at $(Get-Date -format 'u')"
+			Exit 0
+		} Else {
+			Start-AzVM -ResourceGroupName $VM_ResourceGroupName -Name $VM_Name
+		}
+	} Else {
+		If ($AzVM_RunningCode -eq "PowerState/deallocated") {
+			Write-Warning -Message "VM is already deallocated. Nothing to do.`nExiting at $(Get-Date -format 'u')"
+			Exit 0
+		} Else {
+			Stop-AzVM -Force -ResourceGroupName $VM_ResourceGroupName -Name $VM_Name
+		}
+	}
+
+	Write-Output "Success"
+} catch {
+	Write-Error -Exception $_.Exception
+	throw $_.Exception
+}
+
+Write-Output "Runbook run complete at $(Get-Date -format 'u')"
+Exit 0
