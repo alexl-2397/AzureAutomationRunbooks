@@ -1,0 +1,42 @@
+# This is to be used when a disk needs resizing, schedule the runbook to operate when the VM is turned off.
+# Managed Identity for the Automation Account will need Contributor to the resource group as a minimum. It will need to be able to find the Resource Group and VM inside the Subscription (so it will need Reader on the sub).
+
+# Login to Azure and select Subscription
+Connect-AzAccount -Identity
+Set-AzContext -Subscription "<SUB NAME>"
+
+# Set your variables
+$resourceGroupName = "<resourceGroupName>" 
+$vmName = "<vmName>" # E.g. TEST_VM1
+$diskName = "<diskName>" # E.g. TEST_VM1_OsDisk_1_7975592076fa439ea604d894253b1e3f
+$diskSizeGB = 127 # in GBs
+
+### Shouldn't need to change anything below here ###
+
+# Get the status of the VM
+$vm = Get-AzVM -Name $vmName -ResourceGroupName $resourceGroupName -Status
+$vmStatus = $vm.Statuses[1].Code
+
+# Check if the VM is stopped
+if ($vmStatus -eq "PowerState/deallocated") {
+    # Get the disk
+    $disk = Get-AzDisk -DiskName $diskName -ResourceGroupName $resourceGroupName
+
+    # Update the disk
+    $disk.DiskSizeGB = $diskSizeGB
+    Update-AzDisk -Disk $disk -DiskName $diskName -ResourceGroupName $resourceGroupName
+} else {
+    Write-Output "The VM is currently running. Please stop the VM before resizing the disk."
+}
+
+# Wait 5 minutes before powering on the machine
+Start-Sleep -Minutes 5
+Write-Output "Waiting 5 mins before powering on the VM, this is to ensure the disk change doesn't affect startup"
+
+# Check if the VM is deallocated
+if ($vmStatus -eq "PowerState/deallocated") {
+    # Start the VM
+    Start-AzVM -Name $vmName -ResourceGroupName $resourceGroupName
+}
+
+Write-Output "Script has finished running at $(Get-Date -format 'u'), and is now powering back up...`nPlease note you will need to allocate the disk space on the server"
